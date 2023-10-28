@@ -36,10 +36,10 @@ class Env(Environment):
     # check episode termination
     def check_termination(self):
         distance = math.dist(self.pos, self.target_pos)
-        self.reach_goal = ((abs(self.carOrientation - self.targetOrientation) <= 20) \
-            and distance <= self.end_distance[0])
+        # self.reach_goal = ((abs(self.carOrientation - self.targetOrientation) <= 20) \
+        #     and distance <= self.end_distance[0])
         # self.reach_goal = (abs(self.carOrientation - self.targetOrientation) < 5) 
-
+        self.reach_goal = (distance <= self.end_distance[0])
         self.distance_out = distance >= self.end_distance[1] or distance <= self.end_distance[0]
         self.game_finished = self.game_ctr >= self.max_times_in_game
 
@@ -60,40 +60,73 @@ class Env(Environment):
             or self.game_finished
         return done, self.reach_goal
 
+    def calculateAngle(self,A, B, C):
+        # 计算向量AB和BC
+        vectorAB = [B[0] - A[0], B[1] - A[1]]
+        vectorBC = [C[0] - B[0], C[1] - B[1]]
+
+        # 如果向量AB和BC的长度为0，夹角为0度
+        if vectorAB == [0, 0] and vectorBC == [0, 0]:
+            return 0
+
+        # 计算AB和BC的长度
+        lengthAB = math.sqrt(vectorAB[0] ** 2 + vectorAB[1] ** 2)
+        lengthBC = math.sqrt(vectorBC[0] ** 2 + vectorBC[1] ** 2)
+
+        # 如果其中一个向量长度为0，夹角为180度
+        if lengthAB == 0 or lengthBC == 0:
+            return 180
+
+        # 否则，计算夹角
+        dot_product = vectorAB[0] * vectorBC[0] + vectorAB[1] * vectorBC[1]
+        cos_theta = dot_product / (lengthAB * lengthBC)
+
+        # 修正cosine值范围
+        if cos_theta < -1:
+            cos_theta = -1
+        elif cos_theta > 1:
+            cos_theta = 1
+
+        # 计算角度
+        angle_rad = math.acos(cos_theta)
+        degrees = int(angle_rad * (180 / math.pi))
+        return degrees
+
+
     def calculate_reward(self, state: Entity.State, new_state: Entity.State):
         reward = 0
 
         self.pos = [new_state.car_pos.x, new_state.car_pos.y]
         self.prev_pos = [state.car_pos.x, state.car_pos.y]
-
+        # 計算目前車子方向，以我們自己建的180為前進0為後退
         self.carOrientation = Utility.rad2deg(new_state.car_orientation)
         prevCarOrientation = Utility.rad2deg(state.car_orientation)
-        print(state.car_orientation)
+        # print(state.car_orientation)
         target_pos = [state.final_target_pos.x , state.final_target_pos.y]
 
         self.targetOrientation = Utility.rad2deg(Utility.radFromUp(self.pos, target_pos))
     
         ### distance to final target
+        # 計算方式為 (distance[T-1])-(distance[T])
+        # 若距離減短為加分，但為正數時為不行
         prevTargetDist = self.calculate_distance(self.prev_pos, target_pos)
         distanceToTarget = self.calculate_distance(self.pos, target_pos)
+
         distanceDiff = distanceToTarget - prevTargetDist
-        distanceDiff *= 400
+        
         if distanceDiff > 0:
             distanceDiff *= 2
+        distanceDiff *= 400
         reward += -distanceDiff
-        # print("target d", -distanceDiff)
 
-        ### angle gap to target
-        prevTargetOrientation = Utility.rad2deg(Utility.radFromUp(self.prev_pos, target_pos))
-        prevAngleGapToTarget = self.calculate_orientation_diff(prevCarOrientation, prevTargetOrientation)
-        TargetOrientation = Utility.rad2deg(Utility.radFromUp(self.pos, target_pos))
-        angleGapToTarget = self.calculate_orientation_diff(self.carOrientation, TargetOrientation)
-        targetAngleDiff = angleGapToTarget - prevAngleGapToTarget
+        # print("target d", -distanceDiff)
+        # 直接計算車子與目標的角度方向，若為0則代表方向一次，180則為反方向
+        angle = self.calculateAngle(self.prev_pos,self.pos,target_pos)
+        targetAngleDiff = angle
+        # print("target a", angle)
+        
         targetAngleDiff *= 4
-        if targetAngleDiff > 0:
-            targetAngleDiff *= 2
         reward += -targetAngleDiff
-        # print("target a", -targetAngleDiff)
         # print("distance: ", distanceToTarget)
         # print("target: ", state.final_target_pos)
         # print("gap: ", angleGapToTarget)
@@ -193,13 +226,6 @@ class Agt(Agent):
         feature.append(state.wheel_angular_vel.left_front)
         feature.append(state.wheel_angular_vel.right_back)
         feature.append(state.wheel_angular_vel.right_front)
-
-
-        # 轉動軸 in radians
-        # feature.append(utility.decomposeCosSin(state.wheel_orientation.left_back)) 
-        # feature.append(Utility.decomposeCosSin(state.wheel_orientation.left_front))
-        # feature.append(utility.decomposeCosSin(state.wheel_orientation.right_back))
-        # feature.append(utility.decomposeCosSin(state.wheel_orientation.right_front))
         
 
         # min lidar displacement in meters
@@ -221,7 +247,6 @@ class Agt(Agent):
         # feature.append(Utility.decomposeCosSin(rad))
 
         # action
-        # feature.append(state.action_wheel_orientation.left_front)
         feature.append(state.action_wheel_angular_vel.left_back)
         feature.append(state.action_wheel_angular_vel.left_front)
         feature.append(state.action_wheel_angular_vel.right_back)
@@ -242,9 +267,9 @@ def main(mode):
   
     # 0518_car_to_target_few_features 0517_car_to_target_few_features
     chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '0623_car_to_target_slow_retrain_double_prev_/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
-    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '0809_car/model')
-    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '0809_car/')
-    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '0809_car/log')
+    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/model')
+    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/')
+    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/log')
     # chpt_dir_buffer = os.path.join(os.path.dirname(__file__), '..', '..', 'Model', 'DDPG', '0709_car_to_target_slow_retrain_double_prev_/buffer')
 
     agent = Agt(q_lr=0.001, pi_lr=0.001, gamma=0.99, rho=0.005,  \
