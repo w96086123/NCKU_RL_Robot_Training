@@ -62,9 +62,10 @@ class Env(Environment):
 
     def calculateAngle(self,A, B, C):
         # 计算向量AB和BC
-        vectorAB = [B[0] - A[0], B[1] - A[1]]
-        vectorBC = [C[0] - B[0], C[1] - B[1]]
-
+        vectorAB = [int((B[0] - A[0])*1000), int((B[1] - A[1])*1000)]
+        vectorBC = [int((C[0] - B[0])*1000), int((C[1] - B[1])*1000)]
+        print("A",vectorAB)
+        print("B",vectorBC)
         # 如果向量AB和BC的长度为0，夹角为0度
         if vectorAB == [0, 0] and vectorBC == [0, 0]:
             return 0
@@ -113,25 +114,20 @@ class Env(Environment):
         distanceToTarget = self.calculate_distance(self.pos, target_pos)
 
         distanceDiff = distanceToTarget - prevTargetDist
-        
+        print("distance : ",distanceDiff)
         if distanceDiff > 0:
             distanceDiff *= 2
-        distanceDiff *= 200
+        distanceDiff *= 800
         reward += -distanceDiff
 
-        # print("target d", -distanceDiff)
         # 直接計算車子與目標的角度方向，若為0則代表方向一次，180則為反方向
         angle = self.calculateAngle(self.prev_pos,self.pos,target_pos)
         targetAngleDiff = angle
-        # print("target a", angle)
+        print("angle", angle)
         
-        targetAngleDiff *= 2
+        targetAngleDiff *= 1
         reward += -targetAngleDiff
-        # print("distance: ", distanceToTarget)
-        # print("target: ", state.final_target_pos)
-        # print("gap: ", angleGapToTarget)
-        # print("target angle: ", prevTargetOrientation)
-        # print("car angle: ", self.carOrientation)
+
     
 
         ###
@@ -254,7 +250,7 @@ class Agt(Agent):
 
         
         feature = Utility.flatten(feature)
-        # print(len(feature))
+        # print(feature)
         return feature
 
 def main(mode):
@@ -266,10 +262,10 @@ def main(mode):
     env = Env(max_times_in_episode=30, max_times_in_game=210, end_distance=(0.2, 7), stop_target=False, target_fixed_sec=12)
   
     # 0518_car_to_target_few_features 0517_car_to_target_few_features
-    chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '0623_car_to_target_slow_retrain_double_prev_/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
-    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/model')
-    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/')
-    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1028_car/log')
+    chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1029_car/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
+    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/model')
+    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/')
+    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/log')
     # chpt_dir_buffer = os.path.join(os.path.dirname(__file__), '..', '..', 'Model', 'DDPG', '0709_car_to_target_slow_retrain_double_prev_/buffer')
 
     agent = Agt(q_lr=0.001, pi_lr=0.001, gamma=0.99, rho=0.005,  \

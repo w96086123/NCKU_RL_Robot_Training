@@ -230,8 +230,11 @@ class UnityAdaptor():
         ############################# steering angle
         # TODO: Unity takes radian now, actually Unity can take degree
         #unity left: +, right: -
-        unity_action[0] = ai_action[0] * self.steering_angle_range * DEG2RAD
-        unity_action[0] = float(clamp(unity_action[0], -self.steering_angle_range  * DEG2RAD, self.steering_angle_range * DEG2RAD))
+        # unity_action[0] = ai_action[0] * self.steering_angle_range * DEG2RAD
+        # unity_action[0] = float(clamp(unity_action[0], -self.steering_angle_range  * DEG2RAD, self.steering_angle_range * DEG2RAD))
+
+        unity_action[0] = ai_action[0] * self.action_range 
+        unity_action[0] = float(clamp(unity_action[0], -self.action_range, self.action_range))
 
         ############################# forward
         unity_action[1] = ai_action[1] * self.action_range 
