@@ -116,7 +116,7 @@ class Env(Environment):
         
         if distanceDiff > 0:
             distanceDiff *= 2
-        distanceDiff *= 400
+        distanceDiff *= 200
         reward += -distanceDiff
 
         # print("target d", -distanceDiff)
@@ -125,7 +125,7 @@ class Env(Environment):
         targetAngleDiff = angle
         # print("target a", angle)
         
-        targetAngleDiff *= 4
+        targetAngleDiff *= 2
         reward += -targetAngleDiff
         # print("distance: ", distanceToTarget)
         # print("target: ", state.final_target_pos)
@@ -144,8 +144,8 @@ class Env(Environment):
             self.stucked_count = 0
         
         if self.stucked_count > 1:
-            reward += -30 * self.stucked_count
-            print("count ", self.stucked_count)
+            reward += -50 * self.stucked_count
+            # print("count ", self.stucked_count)
         
         
         # print("total ", reward)
@@ -163,7 +163,7 @@ class Env(Environment):
         done, reachGoal = self.check_termination() #self.trailOrientation
 
         if reachGoal:
-            reward += 400
+            reward += 1000
         
         info = {'prev pos': []}
         info['prev pos'] = self.prev_pos
@@ -278,7 +278,7 @@ def main(mode):
         
         chpt_dir_load=chpt_dir_load, chpt_dir_save=chpt_dir_save)
     # replay_buffer_size=1000000, !! test\
-    epoch = 5000
+    epoch = 50000
 
     reward_history, reward_history_ = ([] for i in range(2))
 
@@ -394,7 +394,7 @@ def main(mode):
                 actor_loss_history_.append(a_loss_episode)
                 reward_history_.append(np.mean(reward_history[-50:]))
 
-                if (i) % 200 == 0:
+                if (i) % 100 == 0:
                     agent.save_models(i)
                     Utility.plot(reward_history_, lr_c_history, lr_a_history, critic_loss_history,
                                 actor_loss_history, i, path=chpt_dir_plot)
