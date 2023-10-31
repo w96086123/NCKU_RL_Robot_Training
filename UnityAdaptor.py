@@ -157,27 +157,25 @@ class UnityAdaptor():
     
 
         state = State(
-            final_target_pos = ROS2Point(x = obs['ROS2TargetPosition']['x'], y = obs['ROS2TargetPosition']['y'], z=0.0),
-            car_pos = ROS2Point(x = obs['ROS2CarPosition']['x'], y = obs['ROS2CarPosition']['y'], z=0.0),
-            path_closest_pos = ROS2Point(x = obs['ROS2PathPositionClosest']['x'], y = obs['ROS2PathPositionClosest']['y'], z=0.0),
-            path_second_pos = ROS2Point(x = obs['ROS2PathPositionSecondClosest']['x'], y = obs['ROS2PathPositionSecondClosest']['y'], z=0.0),
-            path_farthest_pos = ROS2Point(x = obs['ROS2PathPositionFarthest']['x'], y = obs['ROS2PathPositionFarthest']['y'], z=0.0),
-            car_vel = ROS2Point(x = obs['ROS2CarVelocity']['x'], y = obs['ROS2CarVelocity']['y'], z=0.0),
+            final_target_pos = ROS2Point(x = obs[3], y = obs[4], z=0.0),#obs[5]
+            car_pos = ROS2Point(x = obs[2], y = -obs[0], z=0.0),#obs[2]
+            path_closest_pos = ROS2Point(x = obs[6], y = obs[7], z=0.0),#obs[8]
+            path_second_pos = ROS2Point(x = obs[9], y = obs[10], z=0.0),#obs[11]
+            path_farthest_pos = ROS2Point(x = obs[12], y = obs[13], z=0.0),#obs[14] #obs[15~17] ROS2CarPosition 
+            car_vel = ROS2Point(x = obs[18], y = obs[19], z=0.0), #obs[20]
             car_orientation = car_orientation, 
             wheel_orientation = WheelOrientation(left_front = self.radToPositiveRad(wheel_left_front_yaw_z), \
                                                 right_front = self.radToPositiveRad(wheel_right_front_yaw_z)),
-            ##### angular v: unity world space 
-            # Unity and ROS2 -> opposite direction
-            car_angular_vel = obs['ROS2CarAugularVelocity']['z'],
-            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack']['y'], \
-                                                left_front = obs['ROS2WheelAngularVelocityLeftFront']['y'], \
-                                                right_back = obs['ROS2WheelAngularVelocityRightBack']['y'], \
-                                                right_front = obs['ROS2WheelAngularVelocityRightFront']['y']
+
+            car_angular_vel = obs[23], #obs[21 22]
+            #obs[28]
+            wheel_angular_vel = WheelAngularVel(left_back = obs[29], #obs[30]
+                                                left_front = obs[32], #obs[31][33]
+                                                right_back = obs[35], #obs[34 36]
+                                                right_front = obs[38] #obs[37 39] obs[40 41 42 43] ROS2WheelQuaternionLeftBack
                                                 ),
-            min_lidar = obs['ROS2MinRange'],
-            # min_lidar_direciton = ROS2Point(x = obs['ROS2MinRangeDirection']['x'], y = obs['ROS2MinRangeDirection']['y'], z=0.0),
-            # min_lidar_relative_angle = self.calculate_relative_angle_unity_gloabl(obs['ROS2MinRangeDirection']['x'], obs['ROS2MinRangeDirection']['y'], 
-            #                                                                       car_orientation / DEG2RAD),
+            min_lidar = obs[56], #57 58 59
+
 
             action_wheel_angular_vel = WheelAngularVel(left_back = self.discritize_wheel_angular_vel(ai_action[1]), \
                                                 left_front = self.discritize_wheel_angular_vel(ai_action[1]), \
@@ -187,33 +185,10 @@ class UnityAdaptor():
             action_wheel_orientation = WheelOrientation(left_front = self.discritize_wheel_steering_angle(ai_action[0]), \
                                                 right_front = self.discritize_wheel_steering_angle(ai_action[0])),
 
-            ##### angular v: unity local space
-            # state.car_angular_vel = -obs['car angular velocity']['value']
-
-            # state.wheel_angular_vel = WheelAngularVel()
-            # state.wheel_angular_vel.left_back = -obs['wheel angular velocity']['left back']
-            # state.wheel_angular_vel.left_front = -obs['wheel angular velocity']['left front']
-            # state.wheel_angular_vel.right_back = -obs['wheel angular velocity']['right back']
-            # state.wheel_angular_vel.right_front = -obs['wheel angular velocity']['right front']
+            
         )
-        # print("action in state")
-        # print(ai_action)
-        # print(self.discritize_wheel_steering_angle(ai_action[0]))
-        # print(self.discritize_wheel_angular_vel(ai_action[1]))
 
-        # print(f"car position: {state.car_pos.x:.2f}, {state.car_pos.y:.2f}")
-        # print(f"closest path position: {state.path_closest_pos.x:.2f}, {state.path_closest_pos.y:.2f}")
-        # print(f"furthest path position: {state.path_farthest_pos.x:.2f}, {state.path_farthest_pos.y:.2f}")
-        # print(f"car velocity: {state.car_vel.x:.2f}, {state.car_vel.y:.2f}")
-        # print(f"car orientation: {car_orientation/DEG2RAD:.2f}")
-        # print(f"wheel orientation: {state.wheel_orientation.left_front/DEG2RAD:.2f}")
-        # print(f"car yaw: {car_yaw_z/DEG2RAD}")
-        # print(f"car prev yaw: {self.prev_car_yaw/DEG2RAD}")
-        # print(f"car angular velocity: {state.car_angular_vel:.2f}, {((self.prev_car_yaw - car_yaw_z)/0.05):.2f}")
-        # print(f"wheel angular velocity: {state.wheel_angular_vel.left_back:.2f}")
         
-        # print(unity_action)
-        # print(f"{state.action_wheel_orientation.left_front}, {state.action_wheel_angular_vel.left_back}")
 
         self.prev_car_yaw = car_yaw_z
 
@@ -241,6 +216,6 @@ class UnityAdaptor():
         unity_action[1] = float(clamp(unity_action[1], -self.action_range, self.action_range))
         
         # print(unity_action)
-        action_sent_to_unity = {'title': 'action', 'content': {'voltage': unity_action}}
+        action_sent_to_unity = [0.0, unity_action[0], unity_action[1]]
    
         return action_sent_to_unity, unity_action

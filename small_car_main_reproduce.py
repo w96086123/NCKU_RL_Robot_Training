@@ -17,6 +17,12 @@ import random
 
 import time
 
+import threading
+import sys
+from rclpy.node import Node
+import rcplay
+from std_msgs.msg import Float32MultiArray
+
 DEG2RAD = 0.01745329251
 
 # Seed
@@ -28,6 +34,35 @@ np.random.seed(seed)
 random.seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
+
+class AiNode(Node):
+    def _init_(self):
+        self.get_logger().info("Ai start")
+        self.subsvriber_ = self.creat_subscription(Float32MultiArray, "ros2Ai",self.receive_data_from_ros, 10)
+        self.publisher_Ai2ros = self.create_publisher(Float32MultiArray, "Ai2ros", 10)
+    
+    def publish2Ros(self, data):
+        self.data2Ros = Float32MultiArray()
+        self.data2Ros.data = data
+        self.publisher_Ai2ros.publish(self.data2Ros)
+    
+    def receive_data_from_ros(self,msg):
+        global unityState
+        unityState = msg.data
+        print("!"*20)
+        print(unityState)
+
+def spin_props(node):
+    exe = rclpy.exectors.SingleThreadedExecutor()
+    exe.add_node(node)
+    exe.spin()
+    rclpy.shutdown()
+    sys.exit(0)
+
+def returnUnityState():
+    while len(unityState) == 0:
+        pass
+    return unityState
 
 class Env(Environment):
     def __init__(self, max_times_in_episode, max_times_in_game, end_distance, stop_target, target_fixed_sec):
@@ -257,9 +292,9 @@ def main(mode):
     print('The mode is:', mode)
 
     # TODO paramaterization
-    server = Server(port=5055) #5055
-    # t = CustomThread(server)
-    env = Env(max_times_in_episode=30, max_times_in_game=210, end_distance=(0.2, 7), stop_target=False, target_fixed_sec=12)
+    # server = Server(port=5055) #5055
+    # # t = CustomThread(server)
+    env = Env(max_times_in_episode=10, max_times_in_game=210, end_distance=(0.2, 7), stop_target=False, target_fixed_sec=12)
   
     # 0518_car_to_target_few_features 0517_car_to_target_few_features
     chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1029_car/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
@@ -274,7 +309,7 @@ def main(mode):
         
         chpt_dir_load=chpt_dir_load, chpt_dir_save=chpt_dir_save)
     # replay_buffer_size=1000000, !! test\
-    epoch = 50000
+    epoch = 5000
 
     reward_history, reward_history_ = ([] for i in range(2))
 
@@ -300,6 +335,10 @@ def main(mode):
                 # min_lidar_relative_angle=0.0,
                 action_wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
                 action_wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0))
+    rclpy.init()
+    node = AiNode()
+    pros = threading.Thread(target=spin_pros, args=(node,))
+    pros.start()  
 
     try:
         if mode == 'train':
@@ -326,15 +365,18 @@ def main(mode):
             for i in range(load_step+1, load_step+epoch+1):
                 if unity_obs == None:
                     while unity_obs is None:
-                        unity_obs = server.recvData()
+                        unity_obs = returnUnityState()
                     state = unity_adaptor.transfer_obs(unity_obs, unity_action)    
                     env.restart_game(state)
                 else:
                     restart_game = env.restart_episode()
                     if restart_game:
-                        new_target = {'title': 'new target', 'content': {}}
-                        server.sendAction(new_target)
-                        unity_obs = server.recvData()
+                        # new_target = {'title': 'new target', 'content': {}} 
+                        new_target = [1.0]
+                        node.publish2Ros(new_target)
+                        # server.sendAction(new_target)
+                        # unity_obs = server.recvData()
+                        unity_obs = returnUnityState()
                         state = unity_adaptor.transfer_obs(unity_obs, unity_action)    
                         env.restart_game(state)
 
@@ -346,8 +388,7 @@ def main(mode):
                     ai_action = agent.choose_actions(state, prev_pos, trail_original_pos, inference=False)
 
                     action_sent_to_unity, unity_action = unity_adaptor.trasfer_action(ai_action)
-                    server.sendAction(action_sent_to_unity)
-
+                    node.publish2Ros(action_sent_to_unity)
                     time.sleep(0.5) ######
 
                     # calculate time
@@ -358,7 +399,7 @@ def main(mode):
                     # print(elapsed_time)
                     # prev_time_step = datetime.now().microsecond/1000000
 
-                    unity_new_obs = server.recvData()
+                    unity_new_obs = returnUnityState()
                     new_state = unity_adaptor.transfer_obs(unity_new_obs, unity_action)
                     
                     reward, done, info = env.step(state, new_state)
