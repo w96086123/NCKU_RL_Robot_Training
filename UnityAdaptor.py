@@ -6,6 +6,7 @@ from Entity import ControlSignal
 import math
 import numpy as np
 from Utility import clamp
+import json
 
 DEG2RAD = 0.01745329251
 # FRONTDEGREE = 90
@@ -142,40 +143,76 @@ class UnityAdaptor():
         # (left/right) ROS2_Y = -Unity_X
         # (up)         ROS2_Z = Unity_Y 
 
-        car_quaternion = [obs['ROS2CarQuaternion']['x'], obs['ROS2CarQuaternion']['y'],
-                          obs['ROS2CarQuaternion']['z'], obs['ROS2CarQuaternion']['w']]
+        # car_quaternion = [obs['ROS2CarQuaternion']['x'], obs['ROS2CarQuaternion']['y'],
+        #                   obs['ROS2CarQuaternion']['z'], obs['ROS2CarQuaternion']['w']]
+        # car_roll_x, car_pitch_y, car_yaw_z = self.euler_from_quaternion(car_quaternion)
+        # car_orientation = self.radToPositiveRad(car_yaw_z)
+
+        # wheel_quaternion_left_front = [obs['ROS2WheelQuaternionLeftFront']['x'], obs['ROS2WheelQuaternionLeftFront']['y'], 
+        #                                obs['ROS2WheelQuaternionLeftFront']['z'], obs['ROS2WheelQuaternionLeftFront']['w']]
+        # wheel_left_front_roll_x, wheel_left_front_pitch_y, wheel_left_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_left_front)
+      
+        # wheel_quaternion_right_front = [obs['ROS2WheelQuaternionRightFront']['x'], obs['ROS2WheelQuaternionRightFront']['y'], 
+        #                                 obs['ROS2WheelQuaternionRightFront']['z'], obs['ROS2WheelQuaternionRightFront']['w']]
+        # wheel_right_front_roll_x, wheel_right_front_pitch_y, wheel_right_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_right_front)
+
+        obs = json.loads(obs)
+        
+        for key, value in obs.items():
+             if isinstance(value, str) and value.startswith('(') and value.endswith(')'):
+                coordinate_str = value.strip('()')  
+                coordinates = list(map(float, coordinate_str.split(',')))  
+                obs[key] = coordinates  
+
+        car_quaternion = [obs['ROS2CarQuaternion'][0], obs['ROS2CarQuaternion'][1],
+                    obs['ROS2CarQuaternion'][2], obs['ROS2CarQuaternion'][3]]
         car_roll_x, car_pitch_y, car_yaw_z = self.euler_from_quaternion(car_quaternion)
         car_orientation = self.radToPositiveRad(car_yaw_z)
 
-        wheel_quaternion_left_front = [obs['ROS2WheelQuaternionLeftFront']['x'], obs['ROS2WheelQuaternionLeftFront']['y'], 
-                                       obs['ROS2WheelQuaternionLeftFront']['z'], obs['ROS2WheelQuaternionLeftFront']['w']]
+        wheel_quaternion_left_front = [obs['ROS2WheelQuaternionLeftFront'][0], 
+                                       obs['ROS2WheelQuaternionLeftFront'][1], 
+                                       obs['ROS2WheelQuaternionLeftFront'][2], 
+                                       obs['ROS2WheelQuaternionLeftFront'][3]] #48 49 50 51ROS2WheelQuaternionRightBack
         wheel_left_front_roll_x, wheel_left_front_pitch_y, wheel_left_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_left_front)
       
-        wheel_quaternion_right_front = [obs['ROS2WheelQuaternionRightFront']['x'], obs['ROS2WheelQuaternionRightFront']['y'], 
-                                        obs['ROS2WheelQuaternionRightFront']['z'], obs['ROS2WheelQuaternionRightFront']['w']]
+        wheel_quaternion_right_front = [obs['ROS2WheelQuaternionRightFront'][0], 
+                                        obs['ROS2WheelQuaternionRightFront'][1], 
+                                        obs['ROS2WheelQuaternionRightFront'][2], 
+                                        obs['ROS2WheelQuaternionRightFront'][3]]
         wheel_right_front_roll_x, wheel_right_front_pitch_y, wheel_right_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_right_front)
-    
-
+        
         state = State(
-            final_target_pos = ROS2Point(x = obs[3], y = obs[4], z=0.0),#obs[5]
-            car_pos = ROS2Point(x = obs[2], y = -obs[0], z=0.0),#obs[2]
-            path_closest_pos = ROS2Point(x = obs[6], y = obs[7], z=0.0),#obs[8]
-            path_second_pos = ROS2Point(x = obs[9], y = obs[10], z=0.0),#obs[11]
-            path_farthest_pos = ROS2Point(x = obs[12], y = obs[13], z=0.0),#obs[14] #obs[15~17] ROS2CarPosition 
-            car_vel = ROS2Point(x = obs[18], y = obs[19], z=0.0), #obs[20]
+            final_target_pos = ROS2Point(x = obs['ROS2TargetPosition'][0], 
+                                         y = obs['ROS2TargetPosition'][1], 
+                                         z=0.0),#obs[5]
+            car_pos = ROS2Point(x = obs['ROS2CarPosition'][0], 
+                                y = obs['ROS2CarPosition'][1], 
+                                z=0.0),#obs[2]
+            path_closest_pos = ROS2Point(x = obs['ROS2PathPositionClosest'][0], 
+                                         y = obs['ROS2PathPositionClosest'][1], 
+                                         z=0.0),#obs[8]
+            path_second_pos = ROS2Point(x = obs['ROS2PathPositionSecondClosest'][0], 
+                                        y = obs['ROS2PathPositionSecondClosest'][1], 
+                                        z=0.0),#obs[11]
+            path_farthest_pos = ROS2Point(x = obs['ROS2PathPositionFarthest'][0], 
+                                          y = obs['ROS2PathPositionFarthest'][1], 
+                                          z=0.0),#obs[14] #obs[15~17] ROS2CarPosition 
+            car_vel = ROS2Point(x = obs['ROS2CarVelocity'][0], 
+                                y = obs['ROS2CarVelocity'][1], 
+                                z=0.0), #obs[20]
             car_orientation = car_orientation, 
             wheel_orientation = WheelOrientation(left_front = self.radToPositiveRad(wheel_left_front_yaw_z), \
                                                 right_front = self.radToPositiveRad(wheel_right_front_yaw_z)),
 
-            car_angular_vel = obs[23], #obs[21 22]
+            car_angular_vel = obs['ROS2CarAugularVelocity'][2], #obs[21 22]
             #obs[28]
-            wheel_angular_vel = WheelAngularVel(left_back = obs[29], #obs[30]
-                                                left_front = obs[32], #obs[31][33]
-                                                right_back = obs[35], #obs[34 36]
-                                                right_front = obs[38] #obs[37 39] obs[40 41 42 43] ROS2WheelQuaternionLeftBack
+            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack'][1], #obs[30]
+                                                left_front = obs['ROS2WheelAngularVelocityLeftFront'][1], #obs[31][33]
+                                                right_back = obs['ROS2WheelAngularVelocityRightBack'][1], #obs[34 36]
+                                                right_front = obs['ROS2WheelAngularVelocityRightFront'][1] #obs[37 39] obs[40 41 42 43] ROS2WheelQuaternionLeftBack
                                                 ),
-            min_lidar = obs[56], #57 58 59
-
+            min_lidar = obs['ROS2Range'], #57 58 59
+            min_lidar_direciton = obs["ROS2RangePosition"],
 
             action_wheel_angular_vel = WheelAngularVel(left_back = self.discritize_wheel_angular_vel(ai_action[1]), \
                                                 left_front = self.discritize_wheel_angular_vel(ai_action[1]), \
@@ -187,7 +224,6 @@ class UnityAdaptor():
 
             
         )
-
         
 
         self.prev_car_yaw = car_yaw_z

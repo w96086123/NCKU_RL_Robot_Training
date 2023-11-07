@@ -20,10 +20,13 @@ import time
 import threading
 import sys
 from rclpy.node import Node
-import rcplay
+import rclpy
 from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import String
 
 DEG2RAD = 0.01745329251
+
+unityState = list()
 
 # Seed
 seed = 123
@@ -36,24 +39,29 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
 class AiNode(Node):
-    def _init_(self):
-        self.get_logger().info("Ai start")
-        self.subsvriber_ = self.creat_subscription(Float32MultiArray, "ros2Ai",self.receive_data_from_ros, 10)
-        self.publisher_Ai2ros = self.create_publisher(Float32MultiArray, "Ai2ros", 10)
+    def __init__(self):
+        super().__init__("aiNode")
+        self.get_logger().info("Ai start")#ros2Ai #unity2Ros
+        self.subsvriber_ = self.create_subscription(String, "unity2Ros", self.receive_data_from_ros, 10)
+        
+        self.publisher_Ai2ros = self.create_publisher(Float32MultiArray, 'ros2Unity', 10)#Ai2ros #ros2Unity
+        
+
     
     def publish2Ros(self, data):
         self.data2Ros = Float32MultiArray()
         self.data2Ros.data = data
         self.publisher_Ai2ros.publish(self.data2Ros)
-    
-    def receive_data_from_ros(self,msg):
-        global unityState
+
+    def receive_data_from_ros(self, msg):
+        global unityState        
         unityState = msg.data
-        print("!"*20)
-        print(unityState)
+        # print(unityState)
+        # self.unityState = msg.data
+
 
 def spin_props(node):
-    exe = rclpy.exectors.SingleThreadedExecutor()
+    exe = rclpy.executors.SingleThreadedExecutor()
     exe.add_node(node)
     exe.spin()
     rclpy.shutdown()
@@ -69,7 +77,14 @@ class Env(Environment):
         super().__init__(max_times_in_episode, max_times_in_game, end_distance, stop_target, target_fixed_sec)
         self.stucked_count = 0
     # check episode termination
-    def check_termination(self):
+    def check_termination(self, state):
+        
+        print(state.min_lidar_direciton)
+        print(state.min_lidar)
+
+        self.pos = [state.car_pos.x, state.car_pos.y]
+        self.target_pos = [state.final_target_pos.x, state.final_target_pos.y]
+
         distance = math.dist(self.pos, self.target_pos)
         # self.reach_goal = ((abs(self.carOrientation - self.targetOrientation) <= 20) \
         #     and distance <= self.end_distance[0])
@@ -84,8 +99,6 @@ class Env(Environment):
         #     print("episode ctr >= {}".format(self.max_times_in_episode))
         if self.game_finished:
             print("game_ctr >= {}".format(self.max_times_in_game))
-        if distance <= self.end_distance[0]:
-            print("distance <= {}".format(self.end_distance[0]))
         if distance >= self.end_distance[1]:
             print("distance >= {}".format(self.end_distance[1]))
 
@@ -191,7 +204,7 @@ class Env(Environment):
         
         reward = self.calculate_reward(state, new_state)
         
-        done, reachGoal = self.check_termination() #self.trailOrientation
+        done, reachGoal = self.check_termination(state) #self.trailOrientation
 
         if reachGoal:
             reward += 1000
@@ -297,10 +310,10 @@ def main(mode):
     env = Env(max_times_in_episode=10, max_times_in_game=210, end_distance=(0.2, 7), stop_target=False, target_fixed_sec=12)
   
     # 0518_car_to_target_few_features 0517_car_to_target_few_features
-    chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1029_car/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
-    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/model')
-    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/')
-    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/log')
+    chpt_dir_load = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1030_car/model') #0623_car_to_target_slow_retrain_double_prev_wheel_d_05 0621_car_to_target_slow_retrain_double_prev_wheel_d_05 0613_car_to_target_slow_retrain_double_prev:5000 0601_car_to_target_test_1
+    chpt_dir_save = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1107_car/model')
+    chpt_dir_plot = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1107_car/')
+    chpt_dir_log  = os.path.join(os.path.dirname(__file__),  'Model', 'DDPG', '1107_car/log')
     # chpt_dir_buffer = os.path.join(os.path.dirname(__file__), '..', '..', 'Model', 'DDPG', '0709_car_to_target_slow_retrain_double_prev_/buffer')
 
     agent = Agt(q_lr=0.001, pi_lr=0.001, gamma=0.99, rho=0.005,  \
@@ -325,19 +338,21 @@ def main(mode):
                 wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0),
                 car_angular_vel=0.0,
                 wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
-                min_lidar=0.0,
+                min_lidar=[],
                 min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 second_min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 third_min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 max_lidar=0.0,
+                min_lidar_direciton = [0.0],
                 # min_lidar_direciton=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
-                max_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
+                # max_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 # min_lidar_relative_angle=0.0,
                 action_wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
                 action_wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0))
+    
     rclpy.init()
     node = AiNode()
-    pros = threading.Thread(target=spin_pros, args=(node,))
+    pros = threading.Thread(target=spin_props, args=(node,))
     pros.start()  
 
     try:
@@ -348,8 +363,8 @@ def main(mode):
             unity_obs = None
             
             # TODO paramaterization
-            load_step = 0  # 0
-            # agent.load_models(load_step)
+            load_step = 2200  # 0
+            agent.load_models(load_step)
 
             # if os.path.exists(chpt_dir_buffer):
             #     state_mem, action_mem, reward_mem, new_state_mem, terminal_mem = Utility.load_buffer(chpt_dir_buffer, load_step)
