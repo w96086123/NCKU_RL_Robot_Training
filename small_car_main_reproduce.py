@@ -38,6 +38,8 @@ random.seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
+collision_count = 0
+
 class AiNode(Node):
     def __init__(self):
         super().__init__("aiNode")
@@ -75,23 +77,19 @@ def returnUnityState():
 class Env(Environment):
     def __init__(self, max_times_in_episode, max_times_in_game, end_distance, stop_target, target_fixed_sec):
         super().__init__(max_times_in_episode, max_times_in_game, end_distance, stop_target, target_fixed_sec)
-        self.stucked_count = 0
     # check episode termination
     def check_termination(self, state):
         
-        print(state.min_lidar_direciton)
-        print(state.min_lidar)
+        self.collision = collision_count >= 10
 
         self.pos = [state.car_pos.x, state.car_pos.y]
         self.target_pos = [state.final_target_pos.x, state.final_target_pos.y]
 
         distance = math.dist(self.pos, self.target_pos)
-        # self.reach_goal = ((abs(self.carOrientation - self.targetOrientation) <= 20) \
-        #     and distance <= self.end_distance[0])
-        # self.reach_goal = (abs(self.carOrientation - self.targetOrientation) < 5) 
+
         self.reach_goal = (distance <= self.end_distance[0])
         self.distance_out = distance >= self.end_distance[1] or distance <= self.end_distance[0]
-        self.game_finished = self.game_ctr >= self.max_times_in_game
+        self.game_finished = self.game_ctr >= self.max_times_in_game or self.collision 
 
         if self.reach_goal:
             print("reach_goal!!!!!!!!!!!!!!!!!!!")
@@ -99,6 +97,8 @@ class Env(Environment):
         #     print("episode ctr >= {}".format(self.max_times_in_episode))
         if self.game_finished:
             print("game_ctr >= {}".format(self.max_times_in_game))
+            if self.collision:
+                print("collide with obstacles")
         if distance >= self.end_distance[1]:
             print("distance >= {}".format(self.end_distance[1]))
 
@@ -106,14 +106,14 @@ class Env(Environment):
         done = self.reach_goal or self.distance_out \
             or self.episode_ctr >= self.max_times_in_episode \
             or self.game_finished
-        return done, self.reach_goal
+        return done, self.reach_goal,self.collision
 
     def calculateAngle(self,A, B, C):
         # 计算向量AB和BC
         vectorAB = [int((B[0] - A[0])*1000), int((B[1] - A[1])*1000)]
         vectorBC = [int((C[0] - B[0])*1000), int((C[1] - B[1])*1000)]
-        print("A",vectorAB)
-        print("B",vectorBC)
+        # print("A",vectorAB)
+        # print("B",vectorBC)
         # 如果向量AB和BC的长度为0，夹角为0度
         if vectorAB == [0, 0] and vectorBC == [0, 0]:
             return 0
@@ -141,15 +141,26 @@ class Env(Environment):
         degrees = int(angle_rad * (180 / math.pi))
         return degrees
 
+    def choseDirection(self,forwardDirection,angleDirection):
+        min = float("inf")
+        ans = 0
+        for i in range(len(angleDirection)):
+            temp = angleDirection[i]
+            xPrime = forwardDirection[0] - float(temp[0])
+            yPrime = forwardDirection[1] - float(temp[1])
+            if min < xPrime ** 2 + yPrime **2:
+                min = xPrime ** 2 + yPrime **2
+                ans = i
+        return ans 
 
     def calculate_reward(self, state: Entity.State, new_state: Entity.State):
+        global collision_count
         reward = 0
 
         self.pos = [new_state.car_pos.x, new_state.car_pos.y]
         self.prev_pos = [state.car_pos.x, state.car_pos.y]
         # 計算目前車子方向，以我們自己建的180為前進0為後退
-        self.carOrientation = Utility.rad2deg(new_state.car_orientation)
-        prevCarOrientation = Utility.rad2deg(state.car_orientation)
+        forwardDirection = [self.pos[0] - self.prev_pos[0] , self.pos[1] - self.prev_pos[1]]
         # print(state.car_orientation)
         target_pos = [state.final_target_pos.x , state.final_target_pos.y]
 
@@ -173,10 +184,31 @@ class Env(Environment):
         targetAngleDiff = angle
         print("angle", angle)
         
-        targetAngleDiff *= 1
+        targetAngleDiff *= 2
         reward += -targetAngleDiff
 
-    
+        # setup Parameters
+        setMinDistance = 0.5
+        robot2wallDistance = state.min_lidar
+        if state.min_lidar_direciton != []:
+            maxDistance = max(robot2wallDistance)
+            minDistance = min(robot2wallDistance)
+            print("min distance with wall:",minDistance)
+            print("max distance with wall:",maxDistance)
+            # Activate the action only when the minimum distance between the robot and the wall is less than setMinDistance.
+            if minDistance <= setMinDistance :
+                nowDistance = minDistance
+                if not(0<=forwardDirection[0]<=0.5 and 0<=forwardDirection[1]<=0.5):
+                    angleIndex = self.choseDirection(forwardDirection,state.min_lidar_direciton)
+                    nowDistance = robot2wallDistance[angleIndex]
+                print("decrease reward by lidar")
+                print("now direction distance:",nowDistance)
+                reward += -(maxDistance-nowDistance) * 100
+        if 0==forwardDirection[0] and 0==forwardDirection[1]:
+            collision_count += 1
+        else:
+            collision_count =0
+
 
         ###
         if ((self.game_ctr - 1) // 5) == ((self.game_ctr - 2) // 5):
@@ -188,7 +220,7 @@ class Env(Environment):
             self.stucked_count = 0
         
         if self.stucked_count > 1:
-            reward += -50 * self.stucked_count
+            reward += -150 * self.stucked_count
             # print("count ", self.stucked_count)
         
         
@@ -204,7 +236,7 @@ class Env(Environment):
         
         reward = self.calculate_reward(state, new_state)
         
-        done, reachGoal = self.check_termination(state) #self.trailOrientation
+        done, reachGoal,collision = self.check_termination(state) #self.trailOrientation
 
         if reachGoal:
             reward += 1000
@@ -213,7 +245,7 @@ class Env(Environment):
         info['prev pos'] = self.prev_pos
         info['trail original pos'] = [0, 0]
 
-        return reward, done, info
+        return reward, done, info,collision
 
 class Agt(Agent):
     def __init__(self, q_lr, pi_lr, gamma, rho, 
@@ -277,7 +309,8 @@ class Agt(Agent):
         # feature.append(-state.min_lidar_direciton.y)
 
         # min lidar distance
-        # feature.append(state.min_lidar)
+        feature.append(state.min_lidar)
+        # feature.append(state.min_lidar_direciton)
         # feature.append(-1)
 
         # min lidar relative angle to car in radian
@@ -298,7 +331,7 @@ class Agt(Agent):
 
         
         feature = Utility.flatten(feature)
-        # print(feature)
+        # print(len(feature))
         return feature
 
 def main(mode):
@@ -318,11 +351,11 @@ def main(mode):
 
     agent = Agt(q_lr=0.001, pi_lr=0.001, gamma=0.99, rho=0.005,  \
         pretrained=False, new_input_dims=17, \
-        input_dims=17, n_actions=4, batch_size=100, layer1_size=400, layer2_size=300, \
+        input_dims=53, n_actions=4, batch_size=100, layer1_size=400, layer2_size=300, \
         
         chpt_dir_load=chpt_dir_load, chpt_dir_save=chpt_dir_save)
     # replay_buffer_size=1000000, !! test\
-    epoch = 5000
+    epoch = 50000
 
     reward_history, reward_history_ = ([] for i in range(2))
 
@@ -363,8 +396,8 @@ def main(mode):
             unity_obs = None
             
             # TODO paramaterization
-            load_step = 2200  # 0
-            agent.load_models(load_step)
+            load_step = 0  # 0
+            # agent.load_models(load_step)
 
             # if os.path.exists(chpt_dir_buffer):
             #     state_mem, action_mem, reward_mem, new_state_mem, terminal_mem = Utility.load_buffer(chpt_dir_buffer, load_step)
@@ -387,7 +420,10 @@ def main(mode):
                     restart_game = env.restart_episode()
                     if restart_game:
                         # new_target = {'title': 'new target', 'content': {}} 
-                        new_target = [1.0]
+                        if not(collision):
+                            new_target = [1.0]
+                        else:
+                            new_target = [2.0]
                         node.publish2Ros(new_target)
                         # server.sendAction(new_target)
                         # unity_obs = server.recvData()
@@ -403,6 +439,8 @@ def main(mode):
                     ai_action = agent.choose_actions(state, prev_pos, trail_original_pos, inference=False)
 
                     action_sent_to_unity, unity_action = unity_adaptor.trasfer_action(ai_action)
+                    print("wheel L action:",unity_action[0])
+                    print("wheel R action:",unity_action[1])
                     node.publish2Ros(action_sent_to_unity)
                     time.sleep(0.5) ######
 
@@ -417,7 +455,7 @@ def main(mode):
                     unity_new_obs = returnUnityState()
                     new_state = unity_adaptor.transfer_obs(unity_new_obs, unity_action)
                     
-                    reward, done, info = env.step(state, new_state)
+                    reward, done, info,collision = env.step(state, new_state)
                     
                     score += reward
 
@@ -501,7 +539,7 @@ def main(mode):
                     time.sleep(0.2)
                     unity_new_obs = server.recvData()
                     new_state = unity_adaptor.transfer_obs(unity_new_obs, unity_action)
-                    reward, done, info = env.step(state, new_state)
+                    reward, done, info ,collision= env.step(state, new_state)
 
                     # data = Utility.count_stucked_times(new_state, env.stucked_count, env.game_ctr)
                     # stucked_file.write(data)

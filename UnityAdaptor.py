@@ -17,18 +17,6 @@ class UnityAdaptor():
         self.steering_angle_range = steering_angle_range
         self.prev_car_yaw = 0
     
-    # Unity                    ROS2
-    # 45 Eular angle(1, 1)     135(-1, 1)
-    # 315           (-1, 1)    225(-1, -1)
-    # def transfer_orientation(self, unity_orientation):
-    #     ros2_orientation = math.pi - unity_orientation
-    #     if ros2_orientation < 0:
-    #         ros2_orientation += 2*math.pi
-    #     if ros2_orientation == 2*math.pi:
-    #         ros2_orientation = 0.0
-    #     # print("ori")
-    #     # print(unity_orientation / DEG2RAD, ros2_orientation / DEG2RAD)
-    #     return ros2_orientation
     
     def euler_from_quaternion(self, orientation):
         """
@@ -99,63 +87,6 @@ class UnityAdaptor():
 
     def transfer_obs(self, obs, ai_action):
 
-        # obs['final target pos']['x']                             Unity coordinate
-        #                          ['y']       
-
-        # obs['car pos']['x']                                      Unity coordinate
-        #                 ['y']                                      
-
-        # obs['short time target pos']['closest point x']          Unity coordinate
-        #                               ['closest point y']
-        #                               ['second closest point x']
-        #                               ['second closest point y']
-        #                               ['farthest point x']
-        #                               ['farthest point y']
-
-        # obs['car velocity']['x']                                 Unity coordinate, m/s
-        #                      ['y']                         
-
-        # obs['car orientation']['value']                          Unity y rotation in radian, clockwise: 0 - 359 
-
-        # obs['wheel orientation']['left back']                    Unity y rotation in radian, clockwise: 0 - 359 
-        #                           ['left front']  
-        #                           ['right back']
-        #                           ['right front']
-        
-        # obs['car angular velocity']                              car y rotation speed, radian/s, clockwise: +
-
-        # obs['wheel angular velocity']['left back']               car wheel rotation speed, radain/s, front: +, back: -
-        #                                ['left front']      
-        #                                ['right back']
-        #                                ['right front']
-
-        # obs['min range']['value']                                min lidar range in meters
-
-        
-        #     ROS2                                      Unity           
-        # left(+ ++)    0   right(- ++)                       0
-        #               x                           z
-        #               ^                           ^
-        #               |                           |
-        #         y <---                             ---> x
-        #              180
-        # (forward)    ROS2_X = Unity_Z
-        # (left/right) ROS2_Y = -Unity_X
-        # (up)         ROS2_Z = Unity_Y 
-
-        # car_quaternion = [obs['ROS2CarQuaternion']['x'], obs['ROS2CarQuaternion']['y'],
-        #                   obs['ROS2CarQuaternion']['z'], obs['ROS2CarQuaternion']['w']]
-        # car_roll_x, car_pitch_y, car_yaw_z = self.euler_from_quaternion(car_quaternion)
-        # car_orientation = self.radToPositiveRad(car_yaw_z)
-
-        # wheel_quaternion_left_front = [obs['ROS2WheelQuaternionLeftFront']['x'], obs['ROS2WheelQuaternionLeftFront']['y'], 
-        #                                obs['ROS2WheelQuaternionLeftFront']['z'], obs['ROS2WheelQuaternionLeftFront']['w']]
-        # wheel_left_front_roll_x, wheel_left_front_pitch_y, wheel_left_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_left_front)
-      
-        # wheel_quaternion_right_front = [obs['ROS2WheelQuaternionRightFront']['x'], obs['ROS2WheelQuaternionRightFront']['y'], 
-        #                                 obs['ROS2WheelQuaternionRightFront']['z'], obs['ROS2WheelQuaternionRightFront']['w']]
-        # wheel_right_front_roll_x, wheel_right_front_pitch_y, wheel_right_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_right_front)
-
         obs = json.loads(obs)
         
         for key, value in obs.items():
@@ -181,6 +112,12 @@ class UnityAdaptor():
                                         obs['ROS2WheelQuaternionRightFront'][3]]
         wheel_right_front_roll_x, wheel_right_front_pitch_y, wheel_right_front_yaw_z = self.euler_from_quaternion(wheel_quaternion_right_front)
         
+        # 將字串列表轉換為浮點數列表，如果 obs['ROS2Range'] 為空，則補足 36 個 0
+        min_lidar = [float(value) if value else 0.0 for value in obs['ROS2Range']]
+
+        # 補足 0 到長度為 36
+        min_lidar += [0.0] * (36 - len(min_lidar))
+
         state = State(
             final_target_pos = ROS2Point(x = obs['ROS2TargetPosition'][0], 
                                          y = obs['ROS2TargetPosition'][1], 
@@ -211,8 +148,8 @@ class UnityAdaptor():
                                                 right_back = obs['ROS2WheelAngularVelocityRightBack'][1], #obs[34 36]
                                                 right_front = obs['ROS2WheelAngularVelocityRightFront'][1] #obs[37 39] obs[40 41 42 43] ROS2WheelQuaternionLeftBack
                                                 ),
-            min_lidar = obs['ROS2Range'], #57 58 59
-            min_lidar_direciton = obs["ROS2RangePosition"],
+            min_lidar = min_lidar, #57 58 59
+            min_lidar_direciton = [tuple(map(float, direction.strip('()').split(',')[:2])) for direction in obs["ROS2RangePosition"]],
 
             action_wheel_angular_vel = WheelAngularVel(left_back = self.discritize_wheel_angular_vel(ai_action[1]), \
                                                 left_front = self.discritize_wheel_angular_vel(ai_action[1]), \
