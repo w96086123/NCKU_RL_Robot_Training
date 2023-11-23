@@ -29,6 +29,7 @@ class State(BaseModel):
     wheel_orientation: WheelOrientation # around car z axis, counter-clockwise: +, clockwise: -, r/s
     car_angular_vel: float # r/s, in ROS2 around car z axis, yaw++: -, yaw--: +, counter-clockwise: +, clockwise: -, in Unity:  counter-clockwise: -, clockwise: +
     wheel_angular_vel: WheelAngularVel # around car wheel axis, front: +, back: -
+    stand_angular_vel: WheelAngularVel
     min_lidar: list # meter
     min_lidar_direciton: list
 

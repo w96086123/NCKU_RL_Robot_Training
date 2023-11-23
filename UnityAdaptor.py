@@ -143,11 +143,11 @@ class UnityAdaptor():
 
             car_angular_vel = obs['ROS2CarAugularVelocity'][2], #obs[21 22]
             #obs[28]
-            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack'][1], #obs[30]
-                                                left_front = obs['ROS2WheelAngularVelocityLeftFront'][1], #obs[31][33]
+            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack'][1], #obs[30]                                               
                                                 right_back = obs['ROS2WheelAngularVelocityRightBack'][1], #obs[34 36]
-                                                right_front = obs['ROS2WheelAngularVelocityRightFront'][1] #obs[37 39] obs[40 41 42 43] ROS2WheelQuaternionLeftBack
                                                 ),
+            stand_angular_vel = WheelAngularVel(left_front = obs['ROS2StandAngleLeft'][1],
+                                                right_front = obs["ROS2StandAngleRight"][1]),
             min_lidar = min_lidar, #57 58 59
             min_lidar_direciton = [tuple(map(float, direction.strip('()').split(',')[:2])) for direction in obs["ROS2RangePosition"]],
 
@@ -178,11 +178,11 @@ class UnityAdaptor():
         ############################# steering angle
         # TODO: Unity takes radian now, actually Unity can take degree
         #unity left: +, right: -
-        # unity_action[0] = ai_action[0] * self.steering_angle_range * DEG2RAD
-        # unity_action[0] = float(clamp(unity_action[0], -self.steering_angle_range  * DEG2RAD, self.steering_angle_range * DEG2RAD))
+        unity_action[0] = ai_action[0] * self.steering_angle_range * DEG2RAD
+        unity_action[0] = float(clamp(unity_action[0], -self.steering_angle_range  * DEG2RAD, self.steering_angle_range * DEG2RAD))
 
-        unity_action[0] = ai_action[0] * self.action_range 
-        unity_action[0] = float(clamp(unity_action[0], -self.action_range, self.action_range))
+        # unity_action[0] = ai_action[0] * self.action_range 
+        # unity_action[0] = float(clamp(unity_action[0], -self.action_range, self.action_range))
 
         ############################# forward
         unity_action[1] = ai_action[1] * self.action_range 

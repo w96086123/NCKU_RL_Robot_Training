@@ -371,15 +371,13 @@ def main(mode):
                 wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0),
                 car_angular_vel=0.0,
                 wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
+                stand_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
                 min_lidar=[],
                 min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 second_min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 third_min_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
                 max_lidar=0.0,
                 min_lidar_direciton = [0.0],
-                # min_lidar_direciton=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
-                # max_lidar_position=Entity.ROS2Point(x=0.0, y=0.0, z=0.0),
-                # min_lidar_relative_angle=0.0,
                 action_wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
                 action_wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0))
     
@@ -439,8 +437,8 @@ def main(mode):
                     ai_action = agent.choose_actions(state, prev_pos, trail_original_pos, inference=False)
 
                     action_sent_to_unity, unity_action = unity_adaptor.trasfer_action(ai_action)
-                    print("wheel L action:",unity_action[0])
-                    print("wheel R action:",unity_action[1])
+                    print("stand action:",unity_action[0])
+                    print("wheel action:",unity_action[1])
                     node.publish2Ros(action_sent_to_unity)
                     time.sleep(0.5) ######
 
