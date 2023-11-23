@@ -37,6 +37,7 @@ class State(BaseModel):
     # min_lidar_relative_angle: float # radian, base on car, right(x): 0, front(y): 90,  upper: 180 --->x 0, down: -180 --->x 0
 
     action_wheel_angular_vel: WheelAngularVel
+    action_stand_angular_vel: WheelAngularVel
     action_wheel_orientation: WheelOrientation
 
 class ControlSignal(BaseModel):

@@ -299,10 +299,9 @@ class Agt(Agent):
 
         # 前進軸 angular velocity in radians *4 --> *1
         feature.append(state.wheel_angular_vel.left_back)
-        feature.append(state.wheel_angular_vel.left_front)
         feature.append(state.wheel_angular_vel.right_back)
-        feature.append(state.wheel_angular_vel.right_front)
-        
+        feature.append(state.stand_angular_vel.left_front)
+        feature.append(state.stand_angular_vel.right_front)
 
         # min lidar displacement in meters
         # feature.append(-state.min_lidar_direciton.x)
@@ -325,10 +324,10 @@ class Agt(Agent):
 
         # action
         feature.append(state.action_wheel_angular_vel.left_back)
-        feature.append(state.action_wheel_angular_vel.left_front)
         feature.append(state.action_wheel_angular_vel.right_back)
-        feature.append(state.action_wheel_angular_vel.right_front)
 
+        feature.append(state.action_stand_angular_vel.left_front)
+        feature.append(state.action_stand_angular_vel.right_front)
         
         feature = Utility.flatten(feature)
         # print(len(feature))
@@ -379,6 +378,7 @@ def main(mode):
                 max_lidar=0.0,
                 min_lidar_direciton = [0.0],
                 action_wheel_angular_vel=Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
+                action_stand_angular_vel = Entity.WheelAngularVel(left_back=0.0, left_front=0.0, right_back=0.0, right_front=0.0),
                 action_wheel_orientation=Entity.WheelOrientation(left_front=0.0, right_front=0.0))
     
     rclpy.init()

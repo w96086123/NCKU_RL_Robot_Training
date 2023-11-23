@@ -143,11 +143,15 @@ class UnityAdaptor():
 
             car_angular_vel = obs['ROS2CarAugularVelocity'][2], #obs[21 22]
             #obs[28]
-            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack'][1], #obs[30]                                               
+            wheel_angular_vel = WheelAngularVel(left_back = obs['ROS2WheelAngularVelocityLeftBack'][1], #obs[30]    
+                                                left_front= 0.0,                                           
                                                 right_back = obs['ROS2WheelAngularVelocityRightBack'][1], #obs[34 36]
-                                                ),
+                                                right_front= 0.0                                               ),
             stand_angular_vel = WheelAngularVel(left_front = obs['ROS2StandAngleLeft'][1],
-                                                right_front = obs["ROS2StandAngleRight"][1]),
+                                                left_back= 0.0,
+                                                right_front = obs["ROS2StandAngleRight"][1],
+                                                right_back= 0.0,
+                                                ),
             min_lidar = min_lidar, #57 58 59
             min_lidar_direciton = [tuple(map(float, direction.strip('()').split(',')[:2])) for direction in obs["ROS2RangePosition"]],
 
@@ -156,6 +160,11 @@ class UnityAdaptor():
                                                 right_back = self.discritize_wheel_angular_vel(ai_action[1]), \
                                                 right_front = self.discritize_wheel_angular_vel(ai_action[1])
                                                 ),
+            action_stand_angular_vel= WheelAngularVel(left_back = 0.0, \
+                                                left_front = self.discritize_wheel_angular_vel(ai_action[0]), \
+                                                right_back = 0.0, \
+                                                right_front = self.discritize_wheel_angular_vel(ai_action[0])),
+        
             action_wheel_orientation = WheelOrientation(left_front = self.discritize_wheel_steering_angle(ai_action[0]), \
                                                 right_front = self.discritize_wheel_steering_angle(ai_action[0])),
 
